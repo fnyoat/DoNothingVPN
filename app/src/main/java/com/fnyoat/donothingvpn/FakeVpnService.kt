@@ -30,7 +30,7 @@ class FakeVpnService : VpnService(), Runnable {
         saveName(sessionName)
 
         isRunning = true
-        startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_VPN)
+        startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         establish()
         return START_STICKY
     }
