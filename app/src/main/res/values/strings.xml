@@ -8,6 +8,10 @@
     <string name="button_disconnect">Disconnect</string>
     <string name="status_disconnected">Status: Disconnected</string>
     <string name="status_connected">Status: Connected</string>
+    <string name="status_vpn_authorizing">Authorizing VPN…</string>
+    <string name="status_starting">Starting VPN…</string>
+    <string name="vpn_denied">VPN authorization was declined.</string>
+    <string name="start_failed">Failed to start VPN. Check logcat.</string>
     <string name="name_required">Please enter a session name.</string>
     <string name="notif_channel">VPN status</string>
     <string name="notif_title">Connected to %1$s</string>

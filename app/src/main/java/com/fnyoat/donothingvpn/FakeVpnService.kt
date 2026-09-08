@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import java.io.FileInputStream
 import java.io.IOException
 
@@ -30,9 +31,22 @@ class FakeVpnService : VpnService(), Runnable {
         saveName(sessionName)
 
         isRunning = true
-        startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        establish()
-        return START_STICKY
+        lastError = null
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed", e)
+            lastError = e.message
+            isRunning = false
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (establish()) {
+            return START_STICKY
+        }
+        isRunning = false
+        stopSelf()
+        return START_NOT_STICKY
     }
 
     override fun run() {
@@ -56,17 +70,27 @@ class FakeVpnService : VpnService(), Runnable {
         super.onDestroy()
     }
 
-    private fun establish() {
-        if (tunnel != null) return
+    private fun establish(): Boolean {
+        if (tunnel != null) return true
         val builder = Builder()
             .setSession(sessionName)
             // A private /32 kept for the interface only; nothing routes through it.
             .addAddress(TUN_ADDRESS, 32)
             .addRoute(TUN_ADDRESS, 32)
-        tunnel = builder.establish()
-        if (tunnel != null) {
-            reader = Thread(this, "phn_discard").also { it.start() }
+        tunnel = try {
+            builder.establish()
+        } catch (e: Exception) {
+            Log.e(TAG, "establish failed", e)
+            lastError = e.message
+            null
         }
+        if (tunnel == null) {
+            Log.w(TAG, "establish returned null")
+            if (lastError == null) lastError = "VPN establishment failed."
+            return false
+        }
+        reader = Thread(this, "phn_discard").also { it.start() }
+        return true
     }
 
     private fun buildNotification(): Notification {
@@ -103,6 +127,7 @@ class FakeVpnService : VpnService(), Runnable {
     companion object {
         const val EXTRA_NAME = "session_name"
 
+        private const val TAG = "DoNothingVPN"
         private const val TUN_ADDRESS = "10.64.0.1"
         private const val DEFAULT_NAME = "DoNothingVPN"
         private const val PREFS_NAME = "config"
@@ -112,6 +137,10 @@ class FakeVpnService : VpnService(), Runnable {
 
         @Volatile
         var isRunning = false
+            private set
+
+        @Volatile
+        var lastError: String? = null
             private set
 
         fun start(context: Context, name: String) {

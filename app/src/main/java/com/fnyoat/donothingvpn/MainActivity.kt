@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -27,8 +28,11 @@ class MainActivity : Activity() {
         statusView = findViewById(R.id.status_view)
 
         nameInput.setText(FakeVpnService.loadSavedName(this))
-
         connectButton.setOnClickListener { onConnectClicked() }
+
+        FakeVpnService.lastError?.let { error ->
+            Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onResume() {
@@ -38,16 +42,18 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_VPN && resultCode == RESULT_OK) {
-            startVpn()
+        if (requestCode == REQUEST_VPN) {
+            if (resultCode == RESULT_OK) {
+                startVpn()
+            } else {
+                Toast.makeText(this, R.string.vpn_denied, Toast.LENGTH_LONG).show()
+                updateUi()
+            }
         }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_NOTIF) {
-            requestVpnPermission(requireNotification = false)
-        }
     }
 
     private fun onConnectClicked() {
@@ -64,17 +70,24 @@ class MainActivity : Activity() {
         requestVpnPermission()
     }
 
-    private fun requestVpnPermission(requireNotification: Boolean = true) {
-        if (requireNotification &&
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIF)
-            return
+    private fun requestVpnPermission() {
+        statusView.setText(R.string.status_vpn_authorizing)
+        val prepare = try {
+            VpnService.prepare(this)
+        } catch (e: Exception) {
+            Log.e(TAG, "prepare failed", e)
+            Toast.makeText(this, R.string.start_failed, Toast.LENGTH_LONG).show()
+            updateUi()
+            null
         }
-        val prepare = VpnService.prepare(this)
         if (prepare != null) {
-            startActivityForResult(prepare, REQUEST_VPN)
+            try {
+                startActivityForResult(prepare, REQUEST_VPN)
+            } catch (e: Exception) {
+                Log.e(TAG, "show vpn authorization failed", e)
+                Toast.makeText(this, R.string.start_failed, Toast.LENGTH_LONG).show()
+                updateUi()
+            }
         } else {
             startVpn()
         }
@@ -82,8 +95,23 @@ class MainActivity : Activity() {
 
     private fun startVpn() {
         val name = nameInput.text.toString().trim()
-        FakeVpnService.start(this, name)
+        requestNotificationPermission()
+        statusView.setText(R.string.status_starting)
+        try {
+            FakeVpnService.start(this, name)
+        } catch (e: Exception) {
+            Log.e(TAG, "start service failed", e)
+            Toast.makeText(this, R.string.start_failed, Toast.LENGTH_LONG).show()
+        }
         updateUi()
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIF)
+        }
     }
 
     private fun updateUi() {
@@ -95,6 +123,7 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private const val TAG = "DoNothingVPN"
         private const val REQUEST_VPN = 1
         private const val REQUEST_NOTIF = 2
     }
