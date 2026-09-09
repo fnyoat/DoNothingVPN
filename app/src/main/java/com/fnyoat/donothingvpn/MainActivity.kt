@@ -19,7 +19,6 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import org.json.JSONObject
 import java.io.File
 
 class MainActivity : Activity() {
@@ -28,7 +27,6 @@ class MainActivity : Activity() {
     private lateinit var connectButton: Button
     private lateinit var statusView: TextView
 
-    private lateinit var tokenInput: EditText
     private lateinit var renameInput: EditText
     private lateinit var renameButton: Button
     private lateinit var renameStatus: TextView
@@ -43,7 +41,6 @@ class MainActivity : Activity() {
         connectButton = findViewById(R.id.connect_button)
         statusView = findViewById(R.id.status_view)
 
-        tokenInput = findViewById(R.id.token_input)
         renameInput = findViewById(R.id.rename_input)
         renameButton = findViewById(R.id.rename_button)
         renameStatus = findViewById(R.id.rename_status)
@@ -51,10 +48,6 @@ class MainActivity : Activity() {
         nameInput.setText(FakeVpnService.loadSavedName(this))
         connectButton.setOnClickListener { onConnectClicked() }
         renameButton.setOnClickListener { onRenameClicked() }
-
-        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(KEY_TOKEN, null)?.let { saved ->
-            tokenInput.setText(saved)
-        }
 
         FakeVpnService.lastError?.let { error ->
             showErrorDialog(getString(R.string.dialog_failed_title), error)
@@ -229,55 +222,21 @@ class MainActivity : Activity() {
             Toast.makeText(this, R.string.rename_no_name, Toast.LENGTH_SHORT).show()
             return
         }
-        var token = tokenInput.text.toString().trim()
-        if (token.isEmpty()) {
-            token = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(KEY_TOKEN, null).orEmpty()
-        }
-        if (token.isEmpty()) {
-            Toast.makeText(this, R.string.rename_no_token, Toast.LENGTH_SHORT).show()
-            return
-        }
-        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putString(KEY_TOKEN, token).apply()
-
         renameButton.isEnabled = false
         setRenameStatus(R.string.rename_submitted)
         Thread {
             try {
-                if (!GitHubUpdater.dispatchRename(token, newName)) {
-                    setRenameFailed(getString(R.string.rename_failed_prefix) + "dispatch")
-                    return@Thread
-                }
-                setRenameStatus(R.string.rename_waiting)
-                val startedAt = System.currentTimeMillis()
-                var run: JSONObject? = null
-                while (System.currentTimeMillis() - startedAt < RENAME_TIMEOUT_MS) {
-                    val r = GitHubUpdater.findLatestCompletedRun(token, startedAt - 5000)
-                    if (r != null) {
-                        run = r
-                        break
-                    }
-                    Thread.sleep(5000)
-                }
-                if (run == null) {
-                    setRenameFailed(getString(R.string.rename_failed_prefix) + "timeout")
-                    return@Thread
-                }
-                val conclusion = run.optString("conclusion")
-                if (conclusion != "success") {
-                    setRenameFailed(getString(R.string.rename_failed_prefix) + "build $conclusion")
-                    return@Thread
-                }
-                setRenameStatus(R.string.rename_downloading)
-                val destDir = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir, "")
-                val apk = GitHubUpdater.downloadApk(token, run.getLong("id"), destDir)
-                if (apk == null) {
-                    setRenameFailed(getString(R.string.rename_failed_prefix) + "download")
+                val out = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir, "repacked.apk")
+                out.delete()
+                val ok = Repackager.build(this, File(applicationInfo.sourceDir), out, newName)
+                if (!ok) {
+                    setRenameFailed(getString(R.string.rename_failed_prefix) + "pack")
                     return@Thread
                 }
                 setRenameStatus(R.string.rename_installing)
-                mainHandler.post { installApk(apk) }
+                mainHandler.post { installApk(out) }
             } catch (e: Exception) {
-                Log.e(TAG, "rename flow failed", e)
+                Log.e(TAG, "repack flow failed", e)
                 setRenameFailed(getString(R.string.rename_failed_prefix) + (e.message ?: "error"))
             }
         }.start()
@@ -285,18 +244,39 @@ class MainActivity : Activity() {
 
     private fun installApk(file: File) {
         try {
-            val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (!runSilentInstall(file)) {
+                val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(intent)
             }
-            startActivity(intent)
         } catch (e: Exception) {
             Log.e(TAG, "install intent failed", e)
             setRenameFailed(getString(R.string.rename_failed_prefix) + "install")
         }
         renameButton.isEnabled = true
+    }
+
+    private fun runSilentInstall(file: File): Boolean {
+        val sh = "pm install -r -t ${file.absolutePath}"
+        for (su in arrayOf("su", "/system/bin/su", "/system/xbin/su", "/sbin/su", "/bin/su", "/su/bin/su")) {
+            try {
+                val p = ProcessBuilder(su, "-c", sh).redirectErrorStream(true).start()
+                val out = p.inputStream.readBytes().toString(Charsets.UTF_8)
+                p.waitFor()
+                if (out.contains("Success")) {
+                    Log.i(TAG, "silent install via $su ok")
+                    return true
+                }
+                Log.w(TAG, "su $su exit=${p.exitValue()} out=$out")
+            } catch (e: Exception) {
+                Log.w(TAG, "su $su unavailable", e)
+            }
+        }
+        return false
     }
 
     private fun setRenameStatus(strId: Int) {
@@ -314,8 +294,5 @@ class MainActivity : Activity() {
         private const val TAG = "DoNothingVPN"
         private const val REQUEST_VPN = 1
         private const val REQUEST_NOTIF = 2
-        private const val PREFS_NAME = "config"
-        private const val KEY_TOKEN = "gh_token"
-        private const val RENAME_TIMEOUT_MS = 6 * 60 * 1000L
     }
 }

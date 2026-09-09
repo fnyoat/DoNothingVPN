@@ -17,9 +17,9 @@ android {
 
     signingConfigs {
         getByName("debug") {
-            storeFile = rootProject.file("keystore/debug.keystore")
+            storeFile = rootProject.file("keystore/repack.p12")
             storePassword = "android"
-            keyAlias = "androiddebugkey"
+            keyAlias = "repack"
             keyPassword = "android"
         }
     }
