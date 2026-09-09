@@ -106,7 +106,7 @@ class RepackagerTest {
             readResourceBytes("repack.pk8"),
             readResourceBytes("repack.cer")
         )
-        val fixed = File("app/build/repackage/repacked.apk").absoluteFile
+        val fixed = File("build/repackage/repacked.apk").absoluteFile
         fixed.parentFile?.mkdirs()
         output.copyTo(fixed, overwrite = true)
     }
