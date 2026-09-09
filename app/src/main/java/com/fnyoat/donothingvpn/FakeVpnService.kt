@@ -31,6 +31,7 @@ class FakeVpnService : VpnService(), Runnable {
         sessionName = extraName?.takeIf { it.isNotBlank() }
             ?: loadName()
         saveName(sessionName)
+        currentName = sessionName
         Log.d(TAG, "start: extra=$extraName saved=$sessionName")
 
         lastError = null
@@ -72,6 +73,7 @@ class FakeVpnService : VpnService(), Runnable {
 
     override fun onDestroy() {
         if (instance === this) instance = null
+        currentName = null
         teardown()
         isRunning = false
         notifyStateChanged()
@@ -172,6 +174,9 @@ class FakeVpnService : VpnService(), Runnable {
 
         @Volatile
         var stateListener: (() -> Unit)? = null
+
+        @Volatile
+        var currentName: String? = null
 
         @Volatile
         private var instance: FakeVpnService? = null

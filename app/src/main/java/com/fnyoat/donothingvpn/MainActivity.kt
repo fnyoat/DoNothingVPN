@@ -190,7 +190,7 @@ class MainActivity : Activity() {
     private fun updateUi() {
         statusView.setText(
             when {
-                FakeVpnService.isRunning -> R.string.status_connected
+                FakeVpnService.isRunning -> getString(R.string.status_connected, FakeVpnService.currentName ?: "")
                 connecting -> R.string.status_starting
                 else -> R.string.status_disconnected
             }

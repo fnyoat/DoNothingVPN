@@ -7,7 +7,7 @@
     <string name="button_connect">Connect</string>
     <string name="button_disconnect">Disconnect</string>
     <string name="status_disconnected">Status: Disconnected</string>
-    <string name="status_connected">Status: Connected</string>
+    <string name="status_connected">Connected to %1$s</string>
     <string name="status_vpn_authorizing">Authorizing VPN…</string>
     <string name="status_starting">Starting VPN…</string>
     <string name="dialog_failed_title">Failed</string>
