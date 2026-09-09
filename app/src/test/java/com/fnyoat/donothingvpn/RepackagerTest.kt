@@ -145,7 +145,7 @@ class RepackagerTest {
         val signedData = lpField(signer).first
         val signaturesField = lpField(signer).second
         val signatures = lpField(signaturesField).first
-        val publicKey = lpField(signaturesField).first
+        val publicKey = lpField(lpField(signaturesField).second).first
 
         // signedData = LP(digests) LP(certs) LP(attrs)
         val digestsField = lpField(signedData).first
