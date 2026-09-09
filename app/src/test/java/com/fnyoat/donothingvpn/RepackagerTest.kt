@@ -145,13 +145,14 @@ class RepackagerTest {
         val signedData = lpField(signer).first
         val signaturesField = lpField(signer).second
         val signatures = lpField(signaturesField).first
-        val publicKey = lpField(signaturesField.second).first
+        val publicKey = lpField(signaturesField).first
 
         // signedData = LP(digests) LP(certs) LP(attrs)
         val digestsField = lpField(signedData).first
         val certsRemainder = lpField(signedData).second
         val certsField = lpField(certsRemainder).first
-        val attrsContent = lpField(certsRemainder.second).first
+        val attrsRemainder = lpField(certsRemainder).second
+        val attrsContent = lpField(attrsRemainder).first
         assertTrue("attrs must be empty", attrsContent.isEmpty())
         val digestEntry = lpField(digestsField).first
         assertEquals("digest alg id", 0x0103, leInt(digestEntry, 0))
