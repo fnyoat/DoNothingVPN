@@ -11,6 +11,9 @@
     <string name="status_vpn_authorizing">Authorizing VPN…</string>
     <string name="status_starting">Starting VPN…</string>
     <string name="vpn_denied">VPN authorization was declined.</string>
+    <string name="vpn_denied_hint">No confirmation window appeared. Make sure no other VPN is active, allow "background pop-up windows" for this app in system app settings, then tap Connect again.</string>
+    <string name="reason_always_on_vpn">Another VPN (%1$s) is set as Always-On VPN. Disable it in Settings &gt; Network &amp; Internet &gt; VPN, then tap Connect again.</string>
+    <string name="reason_vpn_restricted">VPN configuration is restricted by a device policy on this device.</string>
     <string name="start_failed">Failed to start VPN. Check logcat.</string>
     <string name="name_required">Please enter a session name.</string>
     <string name="notif_channel">VPN status</string>

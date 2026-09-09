@@ -4,9 +4,12 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
+import android.os.UserManager
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
@@ -46,7 +49,8 @@ class MainActivity : Activity() {
             if (resultCode == RESULT_OK) {
                 startVpn()
             } else {
-                Toast.makeText(this, R.string.vpn_denied, Toast.LENGTH_LONG).show()
+                Log.w(TAG, "VPN authorization declined (resultCode=$resultCode)")
+                Toast.makeText(this, R.string.vpn_denied_hint, Toast.LENGTH_LONG).show()
                 updateUi()
             }
         }
@@ -71,6 +75,11 @@ class MainActivity : Activity() {
     }
 
     private fun requestVpnPermission() {
+        vpnBlockReason()?.let { reason ->
+            Toast.makeText(this, reason, Toast.LENGTH_LONG).show()
+            updateUi()
+            return
+        }
         statusView.setText(R.string.status_vpn_authorizing)
         val prepare = try {
             VpnService.prepare(this)
@@ -81,6 +90,7 @@ class MainActivity : Activity() {
             null
         }
         if (prepare != null) {
+            Log.d(TAG, "prepare intent: $prepare")
             try {
                 startActivityForResult(prepare, REQUEST_VPN)
             } catch (e: Exception) {
@@ -91,6 +101,27 @@ class MainActivity : Activity() {
         } else {
             startVpn()
         }
+    }
+
+    private fun vpnBlockReason(): CharSequence? {
+        try {
+            val cm = getSystemService(ConnectivityManager::class.java)
+            val alwaysOn = cm.getAlwaysOnVpnPackageForUser(Process.myUserHandle())
+            if (alwaysOn != null && alwaysOn != packageName) {
+                return getString(R.string.reason_always_on_vpn, alwaysOn)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "always-on vpn check failed", e)
+        }
+        try {
+            val um = getSystemService(UserManager::class.java)
+            if (um.hasUserRestriction(UserManager.DISALLOW_CONFIG_VPN)) {
+                return getString(R.string.reason_vpn_restricted)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "vpn restriction check failed", e)
+        }
+        return null
     }
 
     private fun startVpn() {
