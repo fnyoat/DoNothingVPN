@@ -29,7 +29,16 @@ jobs:
         run: gradle assembleDebug --no-daemon
 
       - name: Unit tests (repack golden)
-        run: gradle testDebugUnitTest --no-daemon
+        run: gradle testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Upload unit test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            app/build/reports/tests/testDebugUnitTest/**/*.html
+            app/build/test-results/testDebugUnitTest/*.xml
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
