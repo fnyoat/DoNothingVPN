@@ -1,14 +1,18 @@
 package com.fnyoat.donothingvpn
 
 import android.content.Context
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.Signature
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.Base64
 import java.util.LinkedHashMap
@@ -231,7 +235,10 @@ object Repackager {
     private fun buildSignatureFile(sf: ByteArray, pk8: ByteArray, cer: ByteArray): ByteArray {
         val kf = KeyFactory.getInstance("RSA")
         val key: PrivateKey = kf.generatePrivate(PKCS8EncodedKeySpec(pk8))
-        val (issuer, serial) = parseIssuerSerial(cer)
+        val xCert = CertificateFactory.getInstance("X.509")
+            .generateCertificate(ByteArrayInputStream(cer)) as X509Certificate
+        val issuer = xCert.issuerX500Principal.encoded
+        val serial = xCert.serialNumber
 
         val sha256 = sha256(sf)
         val attrs = derSet(
@@ -247,7 +254,7 @@ object Repackager {
         val contentInfo = derSeq(derOid("1.2.840.113549.1.7.1"))
         val certSet = derBytes(0xa0, cer)
         val signerInfo = derSeq(
-            derInt(1),
+            derInt(1L),
             derSeq(issuer, derInt(serial)),
             digestAlg,
             derBytes(0xa0, attrs),
@@ -255,7 +262,7 @@ object Repackager {
             derOctet(signed)
         )
         return derSeq(
-            derInt(1),
+            derInt(1L),
             derSet(digestAlg),
             contentInfo,
             certSet,
@@ -263,62 +270,7 @@ object Repackager {
         )
     }
 
-    private fun parseIssuerSerial(cer: ByteArray): Pair<ByteArray, Long> {
-        var t = Tlv(cer)
-        val seq = t.readTlv() // outer SEQUENCE
-        val inner = Tlv(seq.content)
-        var tag = inner.peekTag()
-        if (tag and 0x1f == 0 && (tag and 0xc0) != 0) tag = inner.readTag() // v3 [0]
-        val serialTlv = inner.readTlv()
-        inner.readTlv() // signature alg
-        val issuer = inner.readTlv() // issuer SEQUENCE raw
-        return Pair(issuer.raw, serialInt(serialTlv.content))
-    }
-
-    private fun serialInt(bytes: ByteArray): Long {
-        var v = 0L
-        for (b in bytes) v = (v shl 8) or (b.toLong() and 0xff)
-        return v
-    }
-
     // ---------- DER helpers ----------
-
-    private class Tlv(val data: ByteArray) {
-        var pos = 0
-
-        fun peekTag(): Int = data[pos].toInt() and 0xff
-
-        fun readTag(): Int {
-            var tag = data[pos++].toInt() and 0xff
-            if ((tag and 0x1f) == 0x1f) {
-                do {
-                    tag = (tag shl 8) or (data[pos++].toInt() and 0xff)
-                } while ((data[pos - 1].toInt() and 0x80) != 0)
-            }
-            return tag
-        }
-
-        fun readTlv(): TlvValue {
-            val start = pos
-            readTag()
-            val len = readLen()
-            val content = ByteArray(len)
-            System.arraycopy(data, pos, content, 0, len)
-            pos += len
-            return TlvValue(content, data.copyOfRange(start, pos))
-        }
-
-        private fun readLen(): Int {
-            val b = data[pos++].toInt() and 0xff
-            if (b < 0x80) return b
-            val n = b and 0x7f
-            var v = 0
-            for (i in 0 until n) v = (v shl 8) or (data[pos++].toInt() and 0xff)
-            return v
-        }
-    }
-
-    private class TlvValue(val content: ByteArray, val raw: ByteArray)
 
     private fun derLen(n: Int): ByteArray {
         if (n < 0x80) return byteArrayOf(n.toByte())
@@ -376,6 +328,8 @@ object Repackager {
         } else raw
         return derBytes(0x02, bytes)
     }
+
+    private fun derInt(v: BigInteger): ByteArray = derBytes(0x02, v.toByteArray())
 
     private fun derOid(oid: String): ByteArray {
         val parts = oid.split(".").map { it.toLong() }
