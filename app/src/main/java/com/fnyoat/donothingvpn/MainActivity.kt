@@ -21,6 +21,8 @@ class MainActivity : Activity() {
     private lateinit var connectButton: Button
     private lateinit var statusView: TextView
 
+    private var connecting = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -35,6 +37,26 @@ class MainActivity : Activity() {
         FakeVpnService.lastError?.let { error ->
             showErrorDialog(getString(R.string.dialog_failed_title), error)
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        FakeVpnService.stateListener = {
+            runOnUiThread {
+                if (!FakeVpnService.isRunning && connecting) {
+                    connecting = false
+                    FakeVpnService.lastError?.let { error ->
+                        showErrorDialog(getString(R.string.dialog_failed_title), error)
+                    }
+                }
+                updateUi()
+            }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        FakeVpnService.stateListener = null
     }
 
     override fun onResume() {
@@ -60,7 +82,8 @@ class MainActivity : Activity() {
     }
 
     private fun onConnectClicked() {
-        if (FakeVpnService.isRunning) {
+        if (FakeVpnService.isRunning || connecting) {
+            connecting = false
             FakeVpnService.stop(this)
             updateUi()
             return
@@ -117,11 +140,13 @@ class MainActivity : Activity() {
     private fun startVpn() {
         val name = nameInput.text.toString().trim()
         requestNotificationPermission()
+        connecting = true
         statusView.setText(R.string.status_starting)
         try {
             FakeVpnService.start(this, name)
         } catch (e: Exception) {
             Log.e(TAG, "start service failed", e)
+            connecting = false
             showErrorDialog(getString(R.string.dialog_failed_title), e.message ?: getString(R.string.start_failed))
         }
         updateUi()
@@ -149,10 +174,16 @@ class MainActivity : Activity() {
     }
 
     private fun updateUi() {
-        statusView.setText(if (FakeVpnService.isRunning) R.string.status_connected else R.string.status_disconnected)
-        nameInput.isEnabled = !FakeVpnService.isRunning
+        statusView.setText(
+            when {
+                FakeVpnService.isRunning -> R.string.status_connected
+                connecting -> R.string.status_starting
+                else -> R.string.status_disconnected
+            }
+        )
+        nameInput.isEnabled = !FakeVpnService.isRunning && !connecting
         connectButton.setText(
-            if (FakeVpnService.isRunning) R.string.button_disconnect else R.string.button_connect
+            if (FakeVpnService.isRunning || connecting) R.string.button_disconnect else R.string.button_connect
         )
     }
 

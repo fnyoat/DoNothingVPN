@@ -30,23 +30,28 @@ class FakeVpnService : VpnService(), Runnable {
             ?: loadName()
         saveName(sessionName)
 
-        isRunning = true
         lastError = null
+        isRunning = true
+        notifyStateChanged()
         try {
             startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } catch (e: Exception) {
             Log.e(TAG, "startForeground failed", e)
             lastError = e.message
-            isRunning = false
-            stopSelf()
+            fail()
             return START_NOT_STICKY
         }
-        if (establish()) {
-            return START_STICKY
+        if (!establish()) {
+            fail()
+            return START_NOT_STICKY
         }
+        return START_STICKY
+    }
+
+    private fun fail() {
         isRunning = false
+        notifyStateChanged()
         stopSelf()
-        return START_NOT_STICKY
     }
 
     override fun run() {
@@ -64,14 +69,22 @@ class FakeVpnService : VpnService(), Runnable {
 
     override fun onDestroy() {
         isRunning = false
+        reader?.interrupt()
         reader = null
         tunnel?.close()
         tunnel = null
+        notifyStateChanged()
         super.onDestroy()
     }
 
     private fun establish(): Boolean {
-        if (tunnel != null) return true
+        // Always rebuild so a changed session name becomes active.
+        if (tunnel != null) {
+            reader?.interrupt()
+            reader = null
+            tunnel?.close()
+            tunnel = null
+        }
         val builder = Builder()
             .setSession(sessionName)
             // A private /32 kept for the interface only; nothing routes through it.
@@ -90,7 +103,12 @@ class FakeVpnService : VpnService(), Runnable {
             return false
         }
         reader = Thread(this, "phn_discard").also { it.start() }
+        notifyStateChanged()
         return true
+    }
+
+    private fun notifyStateChanged() {
+        stateListener?.invoke()
     }
 
     private fun buildNotification(): Notification {
@@ -142,6 +160,9 @@ class FakeVpnService : VpnService(), Runnable {
         @Volatile
         var lastError: String? = null
             private set
+
+        @Volatile
+        var stateListener: (() -> Unit)? = null
 
         fun start(context: Context, name: String) {
             val intent = Intent(context, FakeVpnService::class.java).putExtra(EXTRA_NAME, name)
