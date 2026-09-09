@@ -177,11 +177,11 @@ object Repackager {
             out.write(0); pos++
         }
         val poolBytes = out.toByteArray()
-        val stringsStart = 24 + strings.size * 4
+        val stringsStart = 28 + strings.size * 4
         val chunkSize = stringsStart + poolBytes.size
-        val header = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN)
+        val header = ByteBuffer.allocate(28).order(ByteOrder.LITTLE_ENDIAN)
         header.putShort(1.toShort())
-        header.putShort(24.toShort())
+        header.putShort(28.toShort())
         header.putInt(chunkSize)
         header.putInt(strings.size)
         header.putInt(0) // styleCount
