@@ -16,11 +16,11 @@ class RepackagerTest {
         File(File("src/test/resources"), name).absoluteFile
 
     private fun readResourceBytes(name: String): ByteArray =
-        readAll(FileInputStream(resource(name)))
+        readAllNoClose(FileInputStream(resource(name)))
 
-    private fun readAll(ins: InputStream): ByteArray {
+    private fun readAllNoClose(ins: InputStream): ByteArray {
         val out = ByteArrayOutputStream()
-        ins.use { ins2 -> ins2.copyTo(out) }
+        ins.copyTo(out)
         return out.toByteArray()
     }
 
@@ -56,7 +56,7 @@ class RepackagerTest {
         ZipInputStream(out.inputStream().buffered()).use { zip ->
             var e = zip.nextEntry
             while (e != null) {
-                entries[e.name] = readAll(zip)
+                entries[e.name] = readAllNoClose(zip)
                 zip.closeEntry()
                 e = zip.nextEntry
             }
