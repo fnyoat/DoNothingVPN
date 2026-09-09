@@ -1,6 +1,9 @@
 package com.fnyoat.donothingvpn
 
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.InputStream
 import java.util.Base64
 import java.util.zip.ZipInputStream
 import org.junit.Assert.assertEquals
@@ -13,7 +16,13 @@ class RepackagerTest {
         File(File("src/test/resources"), name).absoluteFile
 
     private fun readResourceBytes(name: String): ByteArray =
-        File(resource(name)).readBytes()
+        readAll(FileInputStream(resource(name)))
+
+    private fun readAll(ins: InputStream): ByteArray {
+        val out = ByteArrayOutputStream()
+        ins.use { ins2 -> ins2.copyTo(out) }
+        return out.toByteArray()
+    }
 
     private fun containsSequence(hay: ByteArray, needle: ByteArray): Boolean {
         if (needle.isEmpty() || needle.size > hay.size) return false
@@ -47,7 +56,7 @@ class RepackagerTest {
         ZipInputStream(out.inputStream().buffered()).use { zip ->
             var e = zip.nextEntry
             while (e != null) {
-                entries[e.name] = zip.readBytes()
+                entries[e.name] = readAll(zip)
                 zip.closeEntry()
                 e = zip.nextEntry
             }
