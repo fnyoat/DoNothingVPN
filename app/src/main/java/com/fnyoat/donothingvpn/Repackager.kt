@@ -23,6 +23,12 @@ import java.util.zip.ZipOutputStream
 object Repackager {
     private const val TEMPLATE_LABEL = "DoNothingVPN"
 
+    // APK Signature Scheme v2
+    private const val V2_BLOCK_ID = 0x7109871a
+    private const val V2_SIG_ALG_RSA_PKCS1_V1_5_WITH_SHA256 = 0x0103
+    private const val CHUNK_MAX = 1 shl 20
+    private val V2_MAGIC = "APK Sig Block 42".toByteArray(Charsets.US_ASCII)
+
     fun build(context: Context, sourceApk: File, output: File, newLabel: String): Boolean {
         val pk8 = context.assets.open("repack.pk8").use { it.readBytes() }
         val cer = context.assets.open("repack.cer").use { it.readBytes() }
@@ -66,6 +72,129 @@ object Repackager {
             out.putNextEntry(ZipEntry("META-INF/CERT.SF")); out.write(sf); out.closeEntry()
             out.putNextEntry(ZipEntry("META-INF/CERT.RSA")); out.write(rsa); out.closeEntry()
         }
+        addV2Signature(output, pk8, cer)
+    }
+
+    // ---------- v2 signing ----------
+
+    private fun addV2Signature(file: File, pk8: ByteArray, cer: ByteArray) {
+        val data = file.readBytes()
+        val eocdStart = findEocd(data)
+        val cdirOffset = leInt(data, eocdStart + 16)
+        if (cdirOffset <= 0 || cdirOffset + 22 > eocdStart) throw IllegalStateException("bad cd offset")
+        val before = data.copyOfRange(0, cdirOffset)
+        val cdir = data.copyOfRange(cdirOffset, eocdStart)
+        val eocd = data.copyOfRange(eocdStart, data.size)
+        check(before.size + cdir.size + eocd.size == data.size)
+
+        val kf = KeyFactory.getInstance("RSA")
+        val key: PrivateKey = kf.generatePrivate(PKCS8EncodedKeySpec(pk8))
+        val cert = CertificateFactory.getInstance("X.509")
+            .generateCertificate(ByteArrayInputStream(cer)) as X509Certificate
+
+        val contentDigest = chunkedDigest(listOf(before, cdir, eocd))
+        val digests = lpPairs(listOf(V2_SIG_ALG_RSA_PKCS1_V1_5_WITH_SHA256 to contentDigest))
+        val certificates = lpElem(cer)
+        val attributes = byteArrayOf()
+        val signedData = lpSeq(listOf(digests, certificates, attributes))
+
+        val sig = Signature.getInstance("SHA256withRSA")
+        sig.initSign(key)
+        sig.update(signedData)
+        val signatureBytes = sig.sign()
+        val signatures = lpPairs(listOf(V2_SIG_ALG_RSA_PKCS1_V1_5_WITH_SHA256 to signatureBytes))
+        val signer = lpSeq(listOf(signedData, signatures, cert.publicKey.encoded))
+        val v2Block = lpElem(lpSeq(listOf(signer)))
+
+        val pair = ByteBuffer.allocate(8 + 4 + v2Block.size).order(ByteOrder.LITTLE_ENDIAN)
+            .putLong((4 + v2Block.size).toLong())
+            .putInt(V2_BLOCK_ID)
+            .put(v2Block)
+            .array()
+        val sizeField = (8 + pair.size + 8 + 16) - 8
+        val signingBlock = ByteBuffer.allocate(8 + pair.size + 8 + 16).order(ByteOrder.LITTLE_ENDIAN)
+            .putLong(sizeField.toLong())
+            .put(pair)
+            .putLong(sizeField.toLong())
+            .put(V2_MAGIC)
+            .array()
+
+        val out = ByteArrayOutputStream(before.size + signingBlock.size + cdir.size + eocd.size)
+        out.write(before)
+        out.write(signingBlock)
+        out.write(cdir)
+        out.write(patchEocdOffset(eocd, cdirOffset + signingBlock.size))
+        file.writeBytes(out.toByteArray())
+    }
+
+    private fun findEocd(data: ByteArray): Int {
+        var i = data.size - 22
+        while (i >= 0) {
+            if (data[i] == 0x50.toByte() && data[i + 1] == 0x4b.toByte() &&
+                data[i + 2] == 0x05.toByte() && data[i + 3] == 0x06.toByte()
+            ) return i
+            i--
+        }
+        throw IllegalStateException("no EOCD found")
+    }
+
+    private fun leInt(data: ByteArray, off: Int): Int =
+        (data[off].toInt() and 0xff) or
+            ((data[off + 1].toInt() and 0xff) shl 8) or
+            ((data[off + 2].toInt() and 0xff) shl 16) or
+            ((data[off + 3].toInt() and 0xff) shl 24)
+
+    private fun patchEocdOffset(eocd: ByteArray, newOffset: Int): ByteArray {
+        val b = eocd.copyOf()
+        val be = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(newOffset).array()
+        System.arraycopy(be, 0, b, 16, 4)
+        return b
+    }
+
+    private fun u32le(v: Int): ByteArray =
+        ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(v).array()
+
+    private fun lpElem(x: ByteArray): ByteArray {
+        return ByteBuffer.allocate(4 + x.size).order(ByteOrder.LITTLE_ENDIAN)
+            .putInt(x.size).put(x).array()
+    }
+
+    private fun lpSeq(xs: List<ByteArray>): ByteArray {
+        val out = ByteArrayOutputStream()
+        for (x in xs) out.write(lpElem(x))
+        return out.toByteArray()
+    }
+
+    private fun lpPairs(ps: List<Pair<Int, ByteArray>>): ByteArray {
+        val out = ByteArrayOutputStream()
+        for ((key, value) in ps) {
+            out.write(lpElem(u32le(key) + lpElem(value)))
+        }
+        return out.toByteArray()
+    }
+
+    private fun chunkedDigest(sections: List<ByteArray>): ByteArray {
+        val chunkDigests = ByteArrayOutputStream()
+        var chunkCount = 0
+        for (sec in sections) {
+            var off = 0
+            while (off < sec.size) {
+                val size = minOf(CHUNK_MAX, sec.size - off)
+                val md = MessageDigest.getInstance("SHA-256")
+                md.update(0xa5.toByte())
+                md.update(u32le(size))
+                md.update(sec, off, size)
+                chunkDigests.write(md.digest())
+                chunkCount++
+                off += size
+            }
+        }
+        val agg = ByteBuffer.allocate(5 + chunkCount * 32).order(ByteOrder.LITTLE_ENDIAN)
+            .put(0x5a.toByte())
+            .putInt(chunkCount)
+            .put(chunkDigests.toByteArray())
+            .array()
+        return MessageDigest.getInstance("SHA-256").digest(agg)
     }
 
     // ---------- AXML manifest patch ----------
