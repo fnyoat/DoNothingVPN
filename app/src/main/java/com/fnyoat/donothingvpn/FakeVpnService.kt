@@ -27,9 +27,11 @@ class FakeVpnService : VpnService(), Runnable {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         instance = this
-        sessionName = intent?.getStringExtra(EXTRA_NAME)?.takeIf { it.isNotBlank() }
+        val extraName = intent?.getStringExtra(EXTRA_NAME)
+        sessionName = extraName?.takeIf { it.isNotBlank() }
             ?: loadName()
         saveName(sessionName)
+        Log.d(TAG, "start: extra=$extraName saved=$sessionName")
 
         lastError = null
         isRunning = true
@@ -91,6 +93,7 @@ class FakeVpnService : VpnService(), Runnable {
             tunnel?.close()
             tunnel = null
         }
+        Log.d(TAG, "establish session=$sessionName")
         val builder = Builder()
             .setSession(sessionName)
             // A private /32 kept for the interface only; nothing routes through it.

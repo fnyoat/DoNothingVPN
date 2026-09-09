@@ -152,6 +152,7 @@ class MainActivity : Activity() {
 
     private fun startVpn() {
         val name = nameInput.text.toString().trim()
+        Log.d(TAG, "startVpn name=$name")
         requestNotificationPermission()
         connecting = true
         statusView.setText(R.string.status_starting)
