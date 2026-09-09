@@ -1,7 +1,6 @@
 package com.fnyoat.donothingvpn
 
 import android.content.Context
-import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
@@ -18,67 +17,66 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 object Repackager {
-    private const val TAG = "Repackager"
     private const val TEMPLATE_LABEL = "DoNothingVPN"
 
     fun build(context: Context, sourceApk: File, output: File, newLabel: String): Boolean {
         val pk8 = context.assets.open("repack.pk8").use { it.readBytes() }
         val cer = context.assets.open("repack.cer").use { it.readBytes() }
         return try {
-            val entries = LinkedHashMap<String, ByteArray>()
-            ZipInputStream(sourceApk.inputStream().buffered()).use { zip ->
-                var e = zip.nextEntry
-                while (e != null) {
-                    if (!e.name.startsWith("META-INF/")) {
-                        entries[e.name] = zip.readBytes()
-                    }
-                    zip.closeEntry()
-                    e = zip.nextEntry
-                }
-            }
-            val manifest = entries["AndroidManifest.xml"] ?: return false
-            val patched = patchManifest(manifest, newLabel) ?: run {
-                Log.e(TAG, "cannot find label '$TEMPLATE_LABEL' in manifest")
-                return false
-            }
-            entries["AndroidManifest.xml"] = patched
-
-            val mf = buildManifest(entries)
-            val sf = buildSigFile(mf, entries)
-            val rsa = buildSignatureFile(sf, pk8, cer)
-
-            output.parentFile?.mkdirs()
-            ZipOutputStream(output.outputStream().buffered()).use { out ->
-                out.setLevel(1)
-                for ((name, bytes) in entries) {
-                    out.putNextEntry(ZipEntry(name)); out.write(bytes); out.closeEntry()
-                }
-                out.putNextEntry(ZipEntry("META-INF/CERT.MF")); out.write(mf); out.closeEntry()
-                out.putNextEntry(ZipEntry("META-INF/CERT.SF")); out.write(sf); out.closeEntry()
-                out.putNextEntry(ZipEntry("META-INF/CERT.RSA")); out.write(rsa); out.closeEntry()
-            }
-            Log.i(TAG, "repacked to ${output.absolutePath}")
-            true
+            buildWithKey(sourceApk, output, newLabel, pk8, cer)
         } catch (e: Exception) {
-            Log.e(TAG, "repack failed", e)
+            e.printStackTrace(System.err)
             false
+        }
+    }
+
+    fun buildWithKey(sourceApk: File, output: File, newLabel: String, pk8: ByteArray, cer: ByteArray) {
+        val entries = LinkedHashMap<String, ByteArray>()
+        ZipInputStream(sourceApk.inputStream().buffered()).use { zip ->
+            var e = zip.nextEntry
+            while (e != null) {
+                if (!e.name.startsWith("META-INF/")) {
+                    entries[e.name] = zip.readBytes()
+                }
+                zip.closeEntry()
+                e = zip.nextEntry
+            }
+        }
+        val manifest = entries["AndroidManifest.xml"]
+            ?: throw IllegalStateException("no AndroidManifest.xml in apk")
+        val patched = patchManifest(manifest, newLabel)
+        entries["AndroidManifest.xml"] = patched
+
+        val mf = buildManifest(entries)
+        val sf = buildSigFile(mf, entries)
+        val rsa = buildSignatureFile(sf, pk8, cer)
+
+        output.parentFile?.mkdirs()
+        ZipOutputStream(output.outputStream().buffered()).use { out ->
+            out.setLevel(1)
+            for ((name, bytes) in entries) {
+                out.putNextEntry(ZipEntry(name)); out.write(bytes); out.closeEntry()
+            }
+            out.putNextEntry(ZipEntry("META-INF/CERT.MF")); out.write(mf); out.closeEntry()
+            out.putNextEntry(ZipEntry("META-INF/CERT.SF")); out.write(sf); out.closeEntry()
+            out.putNextEntry(ZipEntry("META-INF/CERT.RSA")); out.write(rsa); out.closeEntry()
         }
     }
 
     // ---------- AXML manifest patch ----------
 
-    private fun patchManifest(data: ByteArray, newLabel: String): ByteArray? {
+    private fun patchManifest(data: ByteArray, newLabel: String): ByteArray {
         val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
         val xmlType = buf.short.toInt() and 0xffff
         val xmlHeaderSize = buf.short.toInt() and 0xffff
         val xmlChunkSize = buf.int
-        if (xmlType != 3) return null
+        if (xmlType != 3) throw IllegalStateException("not an xml chunk")
         val poolStart = xmlHeaderSize
         buf.position(poolStart)
         val poolType = buf.short.toInt() and 0xffff
         val poolHeader = buf.short.toInt() and 0xffff
         val poolChunkSize = buf.int
-        if (poolType != 1) return null
+        if (poolType != 1) throw IllegalStateException("not a string pool")
         val stringCount = buf.int
         val styleCount = buf.int
         val poolFlags = buf.int
@@ -93,10 +91,10 @@ object Repackager {
         for (i in 0 until stringCount) offsets[i] = buf.int
 
         fun stringAt(index: Int): String? {
-            if (index < 0 || index >= stringCount) return null
+            if (index < 0 || index >= stringCount) throw IllegalStateException("pool index out of range")
             val start = dataStart + offsets[index]
             val end = if (index + 1 < stringCount) dataStart + offsets[index + 1] else poolEnd
-            if (start < 0 || end <= start || end > data.size) return null
+            if (start < 0 || end <= start || end > data.size) throw IllegalStateException("pool offset out of range")
             return decodeString(data, start, end, isUtf8)
         }
 
@@ -108,11 +106,11 @@ object Repackager {
                 mods[i] = newLabel
             }
         }
-        if (mods.isEmpty()) return null
+        if (mods.isEmpty()) throw IllegalStateException("label not found in manifest")
 
         val newStringValues = Array(count) { i -> mods[i] ?: stringAt(i) ?: "" }
         val pool = buildStringPool(newStringValues, poolFlags)
-        if (pool == null) return null
+            ?: throw IllegalStateException("string too long for pool")
 
         val oldPoolEndAbs = poolStart + poolChunkSize
         val rest = data.copyOfRange(oldPoolEndAbs, data.size)
