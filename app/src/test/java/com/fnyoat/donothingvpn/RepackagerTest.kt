@@ -37,7 +37,7 @@ class RepackagerTest {
 
     @Test
     fun repack_matches_golden_and_changes_label() {
-        val goldenText = File(resource("golden.json")).readText()
+        val goldenText = java.nio.file.Files.readString(File(resource("golden.json")).toPath())
         val golden = Regex("\"(META-INF/CERT\\.[A-Z]+)\": \"([A-Za-z0-9+/=]+)\"")
             .findAll(goldenText)
             .associate { it.groupValues[1] to it.groupValues[2] }
