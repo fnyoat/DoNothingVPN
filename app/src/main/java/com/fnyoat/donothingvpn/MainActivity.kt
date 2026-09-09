@@ -189,10 +189,12 @@ class MainActivity : Activity() {
 
     private fun updateUi() {
         statusView.setText(
-            when {
-                FakeVpnService.isRunning -> getString(R.string.status_connected, FakeVpnService.currentName ?: "")
-                connecting -> R.string.status_starting
-                else -> R.string.status_disconnected
+            if (FakeVpnService.isRunning) {
+                getString(R.string.status_connected, FakeVpnService.currentName ?: "")
+            } else if (connecting) {
+                getString(R.string.status_starting)
+            } else {
+                getString(R.string.status_disconnected)
             }
         )
         nameInput.isEnabled = !FakeVpnService.isRunning && !connecting
