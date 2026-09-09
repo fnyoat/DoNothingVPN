@@ -24,6 +24,7 @@ object Repackager {
         val cer = context.assets.open("repack.cer").use { it.readBytes() }
         return try {
             buildWithKey(sourceApk, output, newLabel, pk8, cer)
+            true
         } catch (e: Exception) {
             e.printStackTrace(System.err)
             false
