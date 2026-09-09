@@ -167,12 +167,12 @@ object Repackager {
         for (i in strings.indices) {
             val s = strings[i]
             if (s.length > 0x7fff) return null
-            offsets[i] = pos
             val bytes = s.toByteArray(Charsets.UTF_16LE)
             val byteLen = s.length * 2
             while ((pos + 2 + byteLen) % 4 != 0) {
                 out.write(0); pos++
             }
+            offsets[i] = pos
             out.write(s.length and 0xff); out.write((s.length shr 8) and 0xff)
             out.write(bytes)
             pos += 2 + byteLen
