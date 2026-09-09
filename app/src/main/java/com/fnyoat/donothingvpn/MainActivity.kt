@@ -135,7 +135,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun showErrorDialog(title: String, message: String) {
+    private fun showErrorDialog(title: String, message: CharSequence) {
         try {
             AlertDialog.Builder(this)
                 .setTitle(title)
