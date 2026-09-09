@@ -92,7 +92,7 @@ object GitHubUpdater {
         }
     }
 
-    private fun request(token: String, url: String, method: String, body: String? = null): String? {
+    private fun request(token: String, url: String, method: String = "GET", body: String? = null): String? {
         return try {
             val conn = URL(url).openConnection() as HttpURLConnection
             conn.requestMethod = method
