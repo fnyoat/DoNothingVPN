@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.VpnManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
@@ -103,17 +102,6 @@ class MainActivity : Activity() {
     }
 
     private fun vpnBlockReason(): CharSequence? {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val vpnManager = getSystemService(VpnManager::class.java)
-                val alwaysOn = vpnManager.getAlwaysOnVpnPackage()
-                if (alwaysOn != null && alwaysOn != packageName) {
-                    return getString(R.string.reason_always_on_vpn, alwaysOn)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "always-on vpn check failed", e)
-            }
-        }
         try {
             val um = getSystemService(UserManager::class.java)
             if (um.hasUserRestriction(UserManager.DISALLOW_CONFIG_VPN)) {
