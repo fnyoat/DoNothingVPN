@@ -106,7 +106,7 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
                 val vpnManager = getSystemService(VpnManager::class.java)
-                val alwaysOn = vpnManager.getAlwaysOnVpnPackageForUser()
+                val alwaysOn = vpnManager.getAlwaysOnVpnPackage()
                 if (alwaysOn != null && alwaysOn != packageName) {
                     return getString(R.string.reason_always_on_vpn, alwaysOn)
                 }
