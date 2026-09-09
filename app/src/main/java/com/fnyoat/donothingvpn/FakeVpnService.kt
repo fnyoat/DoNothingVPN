@@ -149,6 +149,7 @@ class FakeVpnService : VpnService(), Runnable {
         }
 
         fun stop(context: Context) {
+            isRunning = false
             context.stopService(Intent(context, FakeVpnService::class.java))
         }
 

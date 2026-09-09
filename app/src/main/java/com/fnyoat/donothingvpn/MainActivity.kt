@@ -2,6 +2,7 @@ package com.fnyoat.donothingvpn
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.VpnService
@@ -32,7 +33,7 @@ class MainActivity : Activity() {
         connectButton.setOnClickListener { onConnectClicked() }
 
         FakeVpnService.lastError?.let { error ->
-            Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+            showErrorDialog(getString(R.string.dialog_failed_title), error)
         }
     }
 
@@ -48,7 +49,7 @@ class MainActivity : Activity() {
                 startVpn()
             } else {
                 Log.w(TAG, "VPN authorization declined (resultCode=$resultCode)")
-                Toast.makeText(this, R.string.vpn_denied_hint, Toast.LENGTH_LONG).show()
+                showErrorDialog(getString(R.string.dialog_declined_title), getString(R.string.dialog_declined_message))
                 updateUi()
             }
         }
@@ -74,7 +75,7 @@ class MainActivity : Activity() {
 
     private fun requestVpnPermission() {
         vpnBlockReason()?.let { reason ->
-            Toast.makeText(this, reason, Toast.LENGTH_LONG).show()
+            showErrorDialog(getString(R.string.dialog_failed_title), reason)
             updateUi()
             return
         }
@@ -83,7 +84,7 @@ class MainActivity : Activity() {
             VpnService.prepare(this)
         } catch (e: Exception) {
             Log.e(TAG, "prepare failed", e)
-            Toast.makeText(this, R.string.start_failed, Toast.LENGTH_LONG).show()
+            showErrorDialog(getString(R.string.dialog_failed_title), e.message ?: getString(R.string.start_failed))
             updateUi()
             null
         }
@@ -93,7 +94,7 @@ class MainActivity : Activity() {
                 startActivityForResult(prepare, REQUEST_VPN)
             } catch (e: Exception) {
                 Log.e(TAG, "show vpn authorization failed", e)
-                Toast.makeText(this, R.string.start_failed, Toast.LENGTH_LONG).show()
+                showErrorDialog(getString(R.string.dialog_failed_title), e.message ?: getString(R.string.start_failed))
                 updateUi()
             }
         } else {
@@ -121,7 +122,7 @@ class MainActivity : Activity() {
             FakeVpnService.start(this, name)
         } catch (e: Exception) {
             Log.e(TAG, "start service failed", e)
-            Toast.makeText(this, R.string.start_failed, Toast.LENGTH_LONG).show()
+            showErrorDialog(getString(R.string.dialog_failed_title), e.message ?: getString(R.string.start_failed))
         }
         updateUi()
     }
@@ -131,6 +132,19 @@ class MainActivity : Activity() {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIF)
+        }
+    }
+
+    private fun showErrorDialog(title: String, message: String) {
+        try {
+            AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(android.R.string.ok, null)
+                .setCancelable(false)
+                .show()
+        } catch (e: Exception) {
+            Log.e(TAG, "show dialog failed", e)
         }
     }
 
