@@ -8,6 +8,8 @@ import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.UserManager
 import android.util.Log
 import android.widget.Button
@@ -86,6 +88,7 @@ class MainActivity : Activity() {
             connecting = false
             FakeVpnService.stop(this)
             updateUi()
+            checkAndWarnIfRestarted()
             return
         }
         val name = nameInput.text.toString().trim()
@@ -94,6 +97,16 @@ class MainActivity : Activity() {
             return
         }
         requestVpnPermission()
+    }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun checkAndWarnIfRestarted() {
+        mainHandler.postDelayed({
+            if (FakeVpnService.isRunning) {
+                showErrorDialog(getString(R.string.dialog_always_on_title), getString(R.string.dialog_always_on_message))
+            }
+        }, 800L)
     }
 
     private fun requestVpnPermission() {

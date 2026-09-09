@@ -11,6 +11,8 @@
     <string name="status_vpn_authorizing">Authorizing VPN…</string>
     <string name="status_starting">Starting VPN…</string>
     <string name="dialog_failed_title">Failed</string>
+    <string name="dialog_always_on_title">Cannot Disconnect</string>
+    <string name="dialog_always_on_message">This app is set as Always-On VPN, so the system restarts it immediately after disconnecting. Open Settings → Network &amp; internet → VPN, and turn off Always-On for DoNothingVPN, then disconnect again.</string>
     <string name="dialog_declined_title">VPN Not Authorized</string>
     <string name="dialog_declined_message">The system did not show a VPN confirmation window. This is usually caused by one of the following:\n\n1. Another VPN (or an Always-On VPN) is active — open Settings → Network &amp; internet → VPN and disconnect or remove it.\n2. This app is blocked from showing pop-up windows — open Settings → Apps → DoNothingVPN → background pop-up windows and allow it.\n\nAfter making these changes, tap Connect again.</string>
     <string name="start_failed">Failed to start VPN. Check logcat.</string>

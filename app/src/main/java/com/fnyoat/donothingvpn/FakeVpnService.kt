@@ -26,6 +26,7 @@ class FakeVpnService : VpnService(), Runnable {
     private var sessionName: String = DEFAULT_NAME
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        instance = this
         sessionName = intent?.getStringExtra(EXTRA_NAME)?.takeIf { it.isNotBlank() }
             ?: loadName()
         saveName(sessionName)
@@ -68,13 +69,18 @@ class FakeVpnService : VpnService(), Runnable {
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
+        teardown()
         isRunning = false
+        notifyStateChanged()
+        super.onDestroy()
+    }
+
+    private fun teardown() {
         reader?.interrupt()
         reader = null
         tunnel?.close()
         tunnel = null
-        notifyStateChanged()
-        super.onDestroy()
     }
 
     private fun establish(): Boolean {
@@ -164,6 +170,9 @@ class FakeVpnService : VpnService(), Runnable {
         @Volatile
         var stateListener: (() -> Unit)? = null
 
+        @Volatile
+        private var instance: FakeVpnService? = null
+
         fun start(context: Context, name: String) {
             val intent = Intent(context, FakeVpnService::class.java).putExtra(EXTRA_NAME, name)
             context.startForegroundService(intent)
@@ -171,6 +180,7 @@ class FakeVpnService : VpnService(), Runnable {
 
         fun stop(context: Context) {
             isRunning = false
+            instance?.teardown()
             context.stopService(Intent(context, FakeVpnService::class.java))
         }
 
