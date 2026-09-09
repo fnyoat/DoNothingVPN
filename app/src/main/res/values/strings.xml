@@ -20,4 +20,15 @@
     <string name="name_required">Please enter a session name.</string>
     <string name="notif_channel">VPN status</string>
     <string name="notif_title">Connected to %1$s</string>
+    <string name="rename_title">Rename &amp; Auto-Update</string>
+    <string name="token_hint">GitHub token (ghp_…, stored only on this device)</string>
+    <string name="rename_hint">New app name</string>
+    <string name="button_rename">Rename &amp; Auto-Update</string>
+    <string name="rename_no_name">Enter a new app name first.</string>
+    <string name="rename_no_token">Enter your GitHub token first.</string>
+    <string name="rename_submitted">Build submitted…</string>
+    <string name="rename_waiting">Waiting for the build to finish…</string>
+    <string name="rename_downloading">Downloading new APK…</string>
+    <string name="rename_installing">Opening the installer…</string>
+    <string name="rename_failed_prefix">Rename failed: </string>
 </resources>

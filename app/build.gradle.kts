@@ -43,5 +43,6 @@ kotlin {
 }
 
 dependencies {
+    implementation("androidx.core:core:1.13.1")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
 }
