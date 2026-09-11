@@ -228,11 +228,7 @@ class MainActivity : Activity() {
             try {
                 val out = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir, "repacked.apk")
                 out.delete()
-                val ok = Repackager.build(this, File(applicationInfo.sourceDir), out, newName)
-                if (!ok) {
-                    setRenameFailed(getString(R.string.rename_failed_prefix) + "pack")
-                    return@Thread
-                }
+                Repackager.build(this, File(applicationInfo.sourceDir), out, newName)
                 setRenameStatus(R.string.rename_installing)
                 mainHandler.post { installApk(out) }
             } catch (e: Exception) {

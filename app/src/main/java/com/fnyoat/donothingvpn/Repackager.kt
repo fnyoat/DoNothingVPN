@@ -30,19 +30,20 @@ object Repackager {
     private const val CHUNK_MAX = 1 shl 20
     private val V2_MAGIC = "APK Sig Block 42".toByteArray(Charsets.US_ASCII)
 
-    fun build(context: Context, sourceApk: File, output: File, newLabel: String): Boolean {
+    fun build(context: Context, sourceApk: File, output: File, newLabel: String) {
         val pk8 = context.assets.open("repack.pk8").use { it.readBytes() }
         val cer = context.assets.open("repack.cer").use { it.readBytes() }
-        return try {
-            buildWithKey(sourceApk, output, newLabel, pk8, cer)
-            true
-        } catch (e: Exception) {
-            e.printStackTrace(System.err)
-            false
-        }
+        val currentLabel = try {
+            context.packageManager.getApplicationLabel(context.applicationInfo).toString()
+        } catch (_: Exception) { TEMPLATE_LABEL }
+        buildWithKey(sourceApk, output, newLabel, currentLabel, pk8, cer)
     }
 
     fun buildWithKey(sourceApk: File, output: File, newLabel: String, pk8: ByteArray, cer: ByteArray) {
+        buildWithKey(sourceApk, output, newLabel, TEMPLATE_LABEL, pk8, cer)
+    }
+
+    fun buildWithKey(sourceApk: File, output: File, newLabel: String, templateLabel: String, pk8: ByteArray, cer: ByteArray) {
         val entries = LinkedHashMap<String, ByteArray>()
         ZipInputStream(sourceApk.inputStream().buffered()).use { zip ->
             var e = zip.nextEntry
@@ -56,7 +57,7 @@ object Repackager {
         }
         val manifest = entries["AndroidManifest.xml"]
             ?: throw IllegalStateException("no AndroidManifest.xml in apk")
-        val patched = patchManifest(manifest, newLabel)
+        val patched = patchManifest(manifest, templateLabel, newLabel)
         entries["AndroidManifest.xml"] = patched
 
         val mf = buildManifest(entries)
@@ -266,7 +267,7 @@ object Repackager {
 
     // ---------- AXML manifest patch ----------
 
-    private fun patchManifest(data: ByteArray, newLabel: String): ByteArray {
+    private fun patchManifest(data: ByteArray, templateLabel: String, newLabel: String): ByteArray {
         val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
         val xmlType = buf.short.toInt() and 0xffff
         val xmlHeaderSize = buf.short.toInt() and 0xffff
@@ -303,11 +304,11 @@ object Repackager {
         val mods = mutableMapOf<Int, String>()
         for (i in 0 until count) {
             val s = stringAt(i) ?: continue
-            if (s == TEMPLATE_LABEL) {
+            if (s == templateLabel) {
                 mods[i] = newLabel
             }
         }
-        if (mods.isEmpty()) throw IllegalStateException("label not found in manifest")
+        if (mods.isEmpty()) throw IllegalStateException("label \"$templateLabel\" not found in manifest")
 
         val newStringValues = Array(count) { i -> mods[i] ?: stringAt(i) ?: "" }
         val pool = buildStringPool(newStringValues, poolFlags)
