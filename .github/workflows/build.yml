@@ -40,6 +40,9 @@ jobs:
           fi
           echo "using $APKSIGNER"
           "$APKSIGNER" verify --verbose --print-certs app/build/repackage/repacked.apk
+          # Force v1 (JAR) verification: at the APK's minSdk (26) + valid v2,
+          # apksig skips v1 entirely. Inspect it explicitly so v1 regressions fail the build.
+          "$APKSIGNER" verify --verbose --min-sdk-version 19 app/build/repackage/repacked.apk
 
       - name: Upload unit test results
         if: failure()
