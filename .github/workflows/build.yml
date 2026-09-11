@@ -33,6 +33,9 @@ jobs:
 
       - name: Verify repacked APK with apksigner (v1 + v2)
         run: |
+          # Ensure the repacked APK exists (Gradle may cache and skip the test side-effect)
+          gradle :app:testDebugUnitTest --no-daemon --rerun --tests "*repack_has_verifiable_v2_signature" 2>/dev/null || true
+          ls -la app/build/repackage/repacked.apk
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
           if [ -z "$APKSIGNER" ]; then
             echo "::error::apksigner not found in $ANDROID_HOME/build-tools"
