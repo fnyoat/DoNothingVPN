@@ -16,9 +16,10 @@ import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.Base64
 import java.util.LinkedHashMap
+import java.util.zip.CRC32
+import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 
 object Repackager {
     private const val TEMPLATE_LABEL = "DoNothingVPN"
@@ -63,15 +64,10 @@ object Repackager {
         val rsa = buildSignatureFile(sf, pk8, cer)
 
         output.parentFile?.mkdirs()
-        ZipOutputStream(output.outputStream().buffered()).use { out ->
-            out.setLevel(1)
-            for ((name, bytes) in entries) {
-                out.putNextEntry(ZipEntry(name)); out.write(bytes); out.closeEntry()
-            }
-            out.putNextEntry(ZipEntry("META-INF/MANIFEST.MF")); out.write(mf); out.closeEntry()
-            out.putNextEntry(ZipEntry("META-INF/CERT.SF")); out.write(sf); out.closeEntry()
-            out.putNextEntry(ZipEntry("META-INF/CERT.RSA")); out.write(rsa); out.closeEntry()
-        }
+        entries["META-INF/MANIFEST.MF"] = mf
+        entries["META-INF/CERT.SF"] = sf
+        entries["META-INF/CERT.RSA"] = rsa
+        writeZip(output, entries)
         addV2Signature(output, pk8, cer)
     }
 
@@ -150,6 +146,77 @@ object Repackager {
         System.arraycopy(be, 0, b, 16, 4)
         return b
     }
+
+    // Hand-written ZIP: resources.arsc must be STORED + 4-byte aligned for
+    // Android 11+ (targetSdk>=30) installs. ZipOutputStream cannot control
+    // alignment, so we serialize the archive ourselves.
+    private fun writeZip(file: File, entries: LinkedHashMap<String, ByteArray>) {
+        val buf = ByteArrayOutputStream()
+        val offsets = HashMap<String, Int>()
+        val csizeMap = HashMap<String, Int>()
+        val crcMap = HashMap<String, Int>()
+        val def = Deflater(1, true)
+        for ((name, data) in entries) {
+            val store = name == "resources.arsc"
+            val cdata: ByteArray
+            val csize: Int
+            if (store) {
+                cdata = data
+                csize = data.size
+            } else {
+                def.reset(); def.setInput(data); def.finish()
+                val cb = ByteArrayOutputStream(data.size / 2)
+                val tmp = ByteArray(8192)
+                while (!def.finished()) { val n = def.deflate(tmp); cb.write(tmp, 0, n) }
+                cdata = cb.toByteArray(); csize = cdata.size
+            }
+            val crc = CRC32()
+            crc.update(data)
+            val offset = buf.size()
+            val extraLen = (4 - ((offset + 30 + name.length) % 4)) % 4
+
+            offsets[name] = offset; csizeMap[name] = csize; crcMap[name] = crc.value.toInt()
+            buf.write(u32le(0x04034b50))
+            buf.write(u16le(20)); buf.write(u16le(0)); buf.write(u16le(if (store) 0 else 8))
+            buf.write(u16le(0)); buf.write(u16le(0))
+            buf.write(u32le(crc.value.toInt()))
+            buf.write(u32le(csize))
+            buf.write(u32le(data.size))
+            buf.write(u16le(name.length))
+            buf.write(u16le(extraLen))
+            buf.write(name.toByteArray(Charsets.UTF_8))
+            if (extraLen > 0) buf.write(ByteArray(extraLen))
+            buf.write(cdata)
+        }
+        val cdOffset = buf.size()
+        val cd = ByteArrayOutputStream()
+        for ((name, data) in entries) {
+            val csize = csizeMap.getValue(name)
+            val crc = crcMap.getValue(name)
+            val offset = offsets.getValue(name)
+            cd.write(u32le(0x02014b50))
+            cd.write(u16le(20)); cd.write(u16le(20))
+            cd.write(u16le(0))
+            cd.write(u16le(if (name == "resources.arsc") 0 else 8))
+            cd.write(u16le(0)); cd.write(u16le(0))
+            cd.write(u32le(crc)); cd.write(u32le(csize)); cd.write(u32le(data.size))
+            cd.write(u16le(name.length)); cd.write(u16le(0)); cd.write(u16le(0))
+            cd.write(u16le(0)); cd.write(u16le(0)); cd.write(u32le(0))
+            cd.write(u32le(offset))
+            cd.write(name.toByteArray(Charsets.UTF_8))
+        }
+        buf.write(cd.toByteArray())
+        buf.write(u32le(0x06054b50))
+        buf.write(u16le(0)); buf.write(u16le(0))
+        buf.write(u16le(entries.size)); buf.write(u16le(entries.size))
+        buf.write(u32le(cd.size()))
+        buf.write(u32le(cdOffset))
+        buf.write(u16le(0))
+        file.writeBytes(buf.toByteArray())
+    }
+
+    private fun u16le(v: Int): ByteArray =
+        ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN).putShort((v and 0xffff).toShort()).array()
 
     private fun u32le(v: Int): ByteArray =
         ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(v).array()
