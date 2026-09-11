@@ -207,7 +207,7 @@ class RepackagerTest {
                 e = zip.nextEntry
             }
         }
-        for (name in listOf("META-INF/CERT.MF", "META-INF/CERT.SF", "META-INF/CERT.RSA")) {
+        for (name in listOf("META-INF/MANIFEST.MF", "META-INF/CERT.SF", "META-INF/CERT.RSA")) {
             val actual = Base64.getEncoder().encodeToString(entries.getValue(name))
             assertEquals("$name mismatch vs Python golden", golden.getValue(name), actual)
         }

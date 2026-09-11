@@ -68,7 +68,7 @@ object Repackager {
             for ((name, bytes) in entries) {
                 out.putNextEntry(ZipEntry(name)); out.write(bytes); out.closeEntry()
             }
-            out.putNextEntry(ZipEntry("META-INF/CERT.MF")); out.write(mf); out.closeEntry()
+            out.putNextEntry(ZipEntry("META-INF/MANIFEST.MF")); out.write(mf); out.closeEntry()
             out.putNextEntry(ZipEntry("META-INF/CERT.SF")); out.write(sf); out.closeEntry()
             out.putNextEntry(ZipEntry("META-INF/CERT.RSA")); out.write(rsa); out.closeEntry()
         }
@@ -387,16 +387,19 @@ object Repackager {
             derInt(1L),
             derSeq(issuer, derInt(serial)),
             digestAlg,
-            derBytes(0xa0, attrs),
+            derBytes(0xa0, attrs.copyOfRange(if (attrs[1].toInt() < 0) 2 + (attrs[1].toInt() and 0x7f) else 2, attrs.size)),
             derSeq(derOid("1.2.840.113549.1.1.1"), derNull()),
             derOctet(signed)
         )
         return derSeq(
-            derInt(1L),
-            derSet(digestAlg),
-            contentInfo,
-            certSet,
-            derSet(signerInfo)
+            derOid("1.2.840.113549.1.7.2"),
+            derBytes(0xa0, derSeq(
+                derInt(1L),
+                derSet(digestAlg),
+                contentInfo,
+                certSet,
+                derSet(signerInfo)
+            ))
         )
     }
 
