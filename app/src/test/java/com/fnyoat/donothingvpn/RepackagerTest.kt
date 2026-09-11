@@ -184,7 +184,7 @@ class RepackagerTest {
     @Test
     fun repack_matches_golden_and_changes_label() {
         val goldenText = String(readResourceBytes("golden.json"), Charsets.UTF_8)
-        val golden = Regex("\"(META-INF/CERT\\.[A-Z]+)\":\\s*\"([A-Za-z0-9+/=]+)\"")
+        val golden = Regex("\"(META-INF/(?:MANIFEST|CERT)\\.[A-Z]+)\":\\s*\"([A-Za-z0-9+/=]+)\"")
             .findAll(goldenText)
             .associate { it.groupValues[1] to it.groupValues[2] }
 
