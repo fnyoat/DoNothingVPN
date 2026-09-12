@@ -11,28 +11,19 @@
   <img src="https://img.shields.io/badge/Min%20SDK-26-99aabb?logo=android&logoColor=white" alt="Min SDK 26" />
 </p>
 
-<p align="center"><strong>A tiny fake VPN that connects, then does absolutely nothing.</strong></p>
+<p align="center"><strong>Minimal by design. Its only job: change the VPN connection tip. Nothing else.</strong></p>
 
-## What is it
+## What it does
 
-A small Android app that shows a *connected VPN* notification — without routing a single byte.
-It is a **placebo VPN**: perfect for apps or settings that demand an active VPN connection
-while you stay in full control of your traffic.
+Stays out of your way. The one and only thing this app does is change the
+**VPN connection tip** — the "connected" name that shows in your VPN list and
+status bar. No traffic is routed, no extra features, no bloat.
 
-## Features
+It works by repackaging itself with your chosen name: `Repackager.kt` rewrites
+the app label, re-signs the APK with your own key, and reinstalls the new copy.
 
-- **Real fake VPN** — calls `VpnService.prepare()`, then builds an empty tunnel.
-- **Persistent status** — a "connected" notification stays in your status bar.
-- **Rename & repackage** — change the app (and VPN) name on the fly; it re-signs the APK
-  with your own key and reinstalls it.
-- **Lightweight** — zero permissions beyond asking to become a VPN.
-
-## How it works
-
-The foreground service opens an `android.net.VpnService` and hands an empty builder back
-to the system. Android then shows the VPN-connection icon and notification — nothing more,
-nothing less. `Repackager.kt` rewrites the app label in `AndroidManifest.xml`, re-signs the
-APK, and the installed copy keeps its identity — including the VPN name shown in the status bar.
+Want a VPN that actually <em>does</em> something? Build any other "DoSomethingVPN" —
+just start from a real VPN implementation and change one thing: **the app name**.
 
 ## Build
 
@@ -44,10 +35,6 @@ The debug APK is signed with `keystore/repack.p12`. If `keystore-local.propertie
 the build falls back to the defaults (`android` / `repack`). Keep both out of version control.
 
 CI rebuilds both variants on every push and uploads them as workflow artifacts.
-
-## Why "Do Nothing"?
-
-Some connections are better left unconnected. This one just looks the part.
 
 ---
 

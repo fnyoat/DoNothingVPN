@@ -11,26 +11,18 @@
   <img src="https://img.shields.io/badge/Min%20SDK-26-99aabb?logo=android&logoColor=white" alt="最低 SDK 26" />
 </p>
 
-<p align="center"><strong>一个什么都不干的假 VPN —— 连上之后,就真的什么都不干。</strong></p>
+<p align="center"><strong>极简为本,只做一件事:修改 VPN 连接提示。不做任何多余的事。</strong></p>
 
-## 这是什么
+## 它做什么
 
-一个极小的 Android 应用,只在通知栏显示"已连接 VPN",实际上一个字节都不会转发。
-它是**安慰剂 VPN**:很适合那些坚持要求"VPN 已连接"才肯干活的 APP 或系统设置,
-而你的流量始终由你自己掌控。
+不会在你面前晃。这个应用唯一做的事,就是修改 **VPN 连接提示** —— 也就是 VPN 列表与
+状态栏里显示的那个"已连接"名称。不转发任何流量,不加任何功能,零臃肿。
 
-## 特性
+原理是把它自己用你取的名字重新打包:`Repackager.kt` 改写应用名、用你自己的密钥重新签名,
+然后装回新的副本。
 
-- **真·假 VPN** —— 调用 `VpnService.prepare()`,然后建立一个空隧道。
-- **常驻状态** —— 状态栏一直挂着"已连接"通知。
-- **改名并重打包** —— 随时改应用名(也是 VPN 名),用你自己的密钥重新签名并重装。
-- **零依赖权限** —— 只请求成为 VPN,不碰其它任何权限。
-
-## 原理
-
-前台服务建立 `android.net.VpnService`,把一个空的构建结果交回系统。Android 于是显示
-VPN 连接图标和通知——仅此而已。`Repackager.kt` 改写 `AndroidManifest.xml` 里的应用名、
-重新签名,让重装后的应用保留身份,包括状态栏里显示的 VPN 名称。
+想要一个真正<em>能干实事</em>的 VPN?去构建任何"DoSomethingVPN"—— 从真实的 VPN 实现
+出发,只改一样东西:**应用名称**。
 
 ## 构建
 
@@ -42,10 +34,6 @@ debug APK 使用 `keystore/repack.p12` 签名。若缺少 `keystore-local.proper
 构建会回退到默认值(`android` / `repack`)。两个文件都不要提交进版本库。
 
 CI 会在每次 push 时构建两个变体,并把 APK 作为构建产物上传。
-
-## 为什么叫"Do Nothing"?
-
-有些连接,保持不连接反而更好。这个只负责看起来像连上了。
 
 ---
 

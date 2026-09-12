@@ -11,11 +11,11 @@ val repackProps = Properties().apply {
 }
 
 android {
-    namespace = "com.fnyoat.donothingvpn"
+    namespace = "io.github.fnyoat.donothingvpn"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.fnyoat.donothingvpn"
+        applicationId = "io.github.fnyoat.donothingvpn"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

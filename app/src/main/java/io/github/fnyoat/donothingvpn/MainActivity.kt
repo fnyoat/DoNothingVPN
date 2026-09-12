@@ -1,4 +1,4 @@
-package com.fnyoat.donothingvpn
+package io.github.fnyoat.donothingvpn
 
 import android.Manifest
 import android.app.Activity
