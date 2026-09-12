@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/feature-graphic.png" alt="DoNothingVPN 封面" width="100%" />
+  <img src="assets/icon.png" alt="DoNothingVPN 图标" width="128" />
 </p>
 
 <h1 align="center">DoNothingVPN</h1>
