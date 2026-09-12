@@ -59,8 +59,8 @@ while IFS=$'\t' read -r id key created; do
     fi
     cur="$(cat "$TMP/$f.ts" 2>/dev/null || true)"
     if [ -z "$cur" ] || [ "$created" \> "$cur" ]; then
-      printf '%s' "$created" > "$TMP/$f.ts"
-      printf '%s' "$id" > "$TMP/$f.id"
+      printf '%s\n' "$created" > "$TMP/$f.ts"
+      printf '%s\n' "$id" > "$TMP/$f.id"
     fi
   fi
 done < "$TMP/all.tsv"
