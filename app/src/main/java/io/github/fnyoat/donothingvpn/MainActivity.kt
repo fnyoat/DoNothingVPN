@@ -286,7 +286,7 @@ class MainActivity : Activity() {
                     this,
                     sessionId,
                     Intent(this, MainActivity::class.java),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
                 ).intentSender
                 session.commit(sender)
                 Log.d(TAG, "package installer session $sessionId committed")
