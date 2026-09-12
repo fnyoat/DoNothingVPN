@@ -33,6 +33,10 @@ class MainActivity : Activity() {
 
     private var connecting = false
 
+    private var installPending = false
+    private var installerSurfaced = false
+    private var installAttempts = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -72,6 +76,11 @@ class MainActivity : Activity() {
     override fun onStop() {
         super.onStop()
         FakeVpnService.stateListener = null
+    }
+
+    override fun onPause() {
+        super.onPause()
+        installerSurfaced = true
     }
 
     override fun onResume() {
@@ -255,7 +264,10 @@ class MainActivity : Activity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            startActivity(intent)
+            installPending = true
+            installerSurfaced = false
+            installAttempts = 0
+            fireInstall(intent)
         } catch (e: Exception) {
             Log.e(TAG, "install intent failed", e)
             setRenameFailed(getString(R.string.rename_failed_prefix) + "install")
@@ -263,11 +275,24 @@ class MainActivity : Activity() {
         renameButton.isEnabled = true
     }
 
+    private fun fireInstall(intent: Intent) {
+        installAttempts++
+        Log.i(TAG, "fire install attempt $installAttempts")
+        startActivity(intent)
+        mainHandler.postDelayed({
+            if (installPending && !installerSurfaced && installAttempts < 2) {
+                fireInstall(intent)
+            }
+        }, 700L)
+    }
+
     private fun setRenameStatus(strId: Int) {
         runOnUiThread { renameStatus.setText(strId) }
     }
 
     private fun setRenameFailed(message: String) {
+        installPending = false
+        installerSurfaced = true
         runOnUiThread {
             renameStatus.text = message
             renameButton.isEnabled = true
