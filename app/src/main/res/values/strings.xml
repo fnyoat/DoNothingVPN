@@ -26,6 +26,8 @@
     <string name="rename_no_name">Enter a new app name first.</string>
     <string name="rename_same_name">That is already the current app name.</string>
     <string name="rename_submitted">Packing new APK…</string>
-    <string name="rename_installing">Opening the installer…</string>
+    <string name="rename_installing">Installing…</string>
+    <string name="rename_done">Installed — restart the app to see the new name.</string>
+    <string name="rename_need_source_permission">Allow this app to install unknown apps (prompt below), then tap "Repack &amp; Install" again.</string>
     <string name="rename_failed_prefix">Repack failed: </string>
 </resources>
