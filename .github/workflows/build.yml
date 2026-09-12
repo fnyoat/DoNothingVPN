@@ -25,6 +25,7 @@ jobs:
         with:
           gradle-version: '8.9'
           cache-read-only: false
+          cache-cleanup: disabled
 
       - name: Restore signing keystore from secrets
         env:
