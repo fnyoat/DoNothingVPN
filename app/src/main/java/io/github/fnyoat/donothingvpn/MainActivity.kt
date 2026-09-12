@@ -3,6 +3,7 @@ package io.github.fnyoat.donothingvpn
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
@@ -281,7 +282,13 @@ class MainActivity : Activity() {
                     session.fsync(out)
                     out.close()
                 }
-                session.commit(null)
+                val sender = PendingIntent.getBroadcast(
+                    this,
+                    sessionId,
+                    Intent(this, MainActivity::class.java),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                ).intentSender
+                session.commit(sender)
                 Log.d(TAG, "package installer session $sessionId committed")
             } finally {
                 runCatching { session.close() }
