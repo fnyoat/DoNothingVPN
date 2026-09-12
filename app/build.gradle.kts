@@ -1,6 +1,13 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+val repackProps = Properties().apply {
+    val f = rootProject.file("keystore-local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -18,9 +25,9 @@ android {
     signingConfigs {
         getByName("debug") {
             storeFile = rootProject.file("keystore/repack.p12")
-            storePassword = "android"
-            keyAlias = "repack"
-            keyPassword = "android"
+            storePassword = repackProps.getProperty("repack.storePassword", "android")
+            keyAlias = repackProps.getProperty("repack.keyAlias", "repack")
+            keyPassword = repackProps.getProperty("repack.keyPassword", "android")
         }
     }
 

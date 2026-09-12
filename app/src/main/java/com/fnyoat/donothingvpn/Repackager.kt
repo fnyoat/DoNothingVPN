@@ -40,10 +40,6 @@ object Repackager {
         FakeVpnService.rememberSession(context, newName)
     }
 
-    fun buildWithKey(sourceApk: File, output: File, newLabel: String, pk8: ByteArray, cer: ByteArray) {
-        buildWithKey(sourceApk, output, newLabel, TEMPLATE_LABEL, pk8, cer)
-    }
-
     fun buildWithKey(sourceApk: File, output: File, newLabel: String, templateLabel: String, pk8: ByteArray, cer: ByteArray) {
         val entries = LinkedHashMap<String, ByteArray>()
         ZipInputStream(sourceApk.inputStream().buffered()).use { zip ->

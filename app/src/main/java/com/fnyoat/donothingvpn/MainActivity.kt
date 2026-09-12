@@ -222,6 +222,15 @@ class MainActivity : Activity() {
             Toast.makeText(this, R.string.rename_no_name, Toast.LENGTH_SHORT).show()
             return
         }
+        val currentName = try {
+            packageManager.getApplicationLabel(applicationInfo).toString()
+        } catch (_: Exception) {
+            null
+        }
+        if (newName == currentName) {
+            Toast.makeText(this, R.string.rename_same_name, Toast.LENGTH_SHORT).show()
+            return
+        }
         renameButton.isEnabled = false
         setRenameStatus(R.string.rename_submitted)
         Thread {

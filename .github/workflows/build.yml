@@ -25,6 +25,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Restore signing keystore from secrets
+        env:
+          REPACK_KEYSTORE_B64: ${{ secrets.REPACK_KEYSTORE_B64 }}
+          REPACK_STORE_PASS: ${{ secrets.REPACK_STORE_PASS }}
+          REPACK_KEY_ALIAS: ${{ secrets.REPACK_KEY_ALIAS }}
+          REPACK_KEY_PASS: ${{ secrets.REPACK_KEY_PASS }}
+        run: |
+          mkdir -p keystore
+          printf '%s' "$REPACK_KEYSTORE_B64" | base64 -d > keystore/repack.p12
+          printf 'repack.storePassword=%s\nrepack.keyAlias=%s\nrepack.keyPassword=%s\n' \
+            "$REPACK_STORE_PASS" "$REPACK_KEY_ALIAS" "$REPACK_KEY_PASS" > keystore-local.properties
+
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
 
