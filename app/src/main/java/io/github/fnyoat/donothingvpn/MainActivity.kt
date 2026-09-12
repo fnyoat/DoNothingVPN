@@ -272,8 +272,20 @@ class MainActivity : Activity() {
         try {
             val installer = packageManager.packageInstaller
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-            val sessionId = installer.install(file, params, 0)
-            Log.d(TAG, "package installer session $sessionId started")
+            val sessionId = installer.createSession(params)
+            val session = installer.openSession(sessionId)
+            try {
+                file.inputStream().use { input ->
+                    val out = session.openWrite("repacked", 0, file.length())
+                    input.copyTo(out)
+                    session.fsync(out)
+                    out.close()
+                }
+                session.commit(null)
+                Log.d(TAG, "package installer session $sessionId committed")
+            } finally {
+                runCatching { session.close() }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "package installer failed", e)
             setRenameFailed(getString(R.string.rename_failed_prefix) + "install")
