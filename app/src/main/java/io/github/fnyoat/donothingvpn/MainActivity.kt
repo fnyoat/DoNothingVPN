@@ -295,7 +295,7 @@ class MainActivity : Activity() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "package installer failed", e)
-            setRenameFailed(getString(R.string.rename_failed_prefix) + "install")
+            setRenameFailed(getString(R.string.rename_failed_prefix) + (e.message ?: "install"))
         }
     }
 
@@ -310,7 +310,7 @@ class MainActivity : Activity() {
                 if (success) {
                     renameStatus.setText(R.string.rename_done)
                 } else {
-                    setRenameFailed(getString(R.string.rename_failed_prefix) + "install")
+                    setRenameFailed(getString(R.string.rename_failed_prefix) + "install rejected by system")
                 }
                 setRenameIdle()
             }
