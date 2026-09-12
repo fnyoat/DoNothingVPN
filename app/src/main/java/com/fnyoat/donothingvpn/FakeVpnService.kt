@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
@@ -156,6 +157,9 @@ class FakeVpnService : VpnService(), Runnable {
     companion object {
         const val EXTRA_NAME = "session_name"
 
+        const val SESSION_TEMPLATE = "__SESSION_TEMPLATE__"
+        const val META_KEY = "com.fnyoat.donothingvpn.default_session"
+
         private const val TAG = "DoNothingVPN"
         private const val TUN_ADDRESS = "10.64.0.1"
         private const val DEFAULT_NAME = "DoNothingVPN"
@@ -193,8 +197,30 @@ class FakeVpnService : VpnService(), Runnable {
         }
 
         fun loadSavedName(context: Context): String {
-            return context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .getString(KEY_NAME, DEFAULT_NAME).orEmpty()
+            val saved = getSavedName(context)
+            if (saved != null) return saved
+            return currentSessionName(context)
+        }
+
+        private fun getSavedName(context: Context): String? =
+            context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .getString(KEY_NAME, null)?.takeIf { it.isNotBlank() }
+
+        fun manifestMeta(context: Context): String? = try {
+            context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+                .metaData?.getString(META_KEY)?.takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        }
+
+        fun currentSessionName(context: Context): String {
+            val meta = manifestMeta(context) ?: return DEFAULT_NAME
+            return if (meta == SESSION_TEMPLATE) DEFAULT_NAME else meta
+        }
+
+        fun rememberSession(context: Context, name: String) {
+            context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .edit().putString(KEY_NAME, name).apply()
         }
     }
 }

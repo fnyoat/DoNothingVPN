@@ -30,13 +30,12 @@ object Repackager {
     private const val CHUNK_MAX = 1 shl 20
     private val V2_MAGIC = "APK Sig Block 42".toByteArray(Charsets.US_ASCII)
 
-    fun build(context: Context, sourceApk: File, output: File, newLabel: String) {
+    fun build(context: Context, sourceApk: File, output: File, newName: String) {
         val pk8 = context.assets.open("repack.pk8").use { it.readBytes() }
         val cer = context.assets.open("repack.cer").use { it.readBytes() }
-        val currentLabel = try {
-            context.packageManager.getApplicationLabel(context.applicationInfo).toString()
-        } catch (_: Exception) { TEMPLATE_LABEL }
-        buildWithKey(sourceApk, output, newLabel, currentLabel, pk8, cer)
+        val sessionTemplate = FakeVpnService.manifestMeta(context) ?: FakeVpnService.SESSION_TEMPLATE
+        FakeVpnService.rememberSession(context, newName)
+        buildWithKey(sourceApk, output, newName, sessionTemplate, pk8, cer)
     }
 
     fun buildWithKey(sourceApk: File, output: File, newLabel: String, pk8: ByteArray, cer: ByteArray) {
@@ -308,7 +307,7 @@ object Repackager {
                 mods[i] = newLabel
             }
         }
-        if (mods.isEmpty()) throw IllegalStateException("label \"$templateLabel\" not found in manifest")
+        if (mods.isEmpty()) throw IllegalStateException("template \"$templateLabel\" not found in manifest")
 
         val newStringValues = Array(count) { i -> mods[i] ?: stringAt(i) ?: "" }
         val pool = buildStringPool(newStringValues, poolFlags)

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DoNothingVPN</string>
+    <string name="default_session_name">DoNothingVPN</string>
     <string name="tagline">A VPN that does nothing.</string>
     <string name="description">Creates a VPN connection that routes no traffic. The session name you enter is what appears next to "Connected to" in system notifications and dialogs.</string>
     <string name="name_hint">Session name</string>

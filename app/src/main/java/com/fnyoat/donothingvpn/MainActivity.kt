@@ -45,7 +45,9 @@ class MainActivity : Activity() {
         renameButton = findViewById(R.id.rename_button)
         renameStatus = findViewById(R.id.rename_status)
 
-        nameInput.setText(FakeVpnService.loadSavedName(this))
+        nameInput.setText(
+            FakeVpnService.loadSavedName(this).ifEmpty { getString(R.string.default_session_name) }
+        )
         connectButton.setOnClickListener { onConnectClicked() }
         renameButton.setOnClickListener { onRenameClicked() }
 
