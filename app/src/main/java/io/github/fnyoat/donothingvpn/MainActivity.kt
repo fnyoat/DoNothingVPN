@@ -3,7 +3,9 @@ package io.github.fnyoat.donothingvpn
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.VpnService
@@ -13,12 +15,12 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.UserManager
+import android.provider.Settings
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.FileProvider
 import java.io.File
 
 class MainActivity : Activity() {
@@ -32,10 +34,6 @@ class MainActivity : Activity() {
     private lateinit var renameStatus: TextView
 
     private var connecting = false
-
-    private var installPending = false
-    private var installerSurfaced = false
-    private var installAttempts = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +50,7 @@ class MainActivity : Activity() {
         nameInput.setText(FakeVpnService.loadSavedName(this))
         connectButton.setOnClickListener { onConnectClicked() }
         renameButton.setOnClickListener { onRenameClicked() }
+        packageManager.packageInstaller.registerSessionCallback(sessionCallback)
 
         FakeVpnService.lastError?.let { error ->
             showErrorDialog(getString(R.string.dialog_failed_title), error)
@@ -78,14 +77,14 @@ class MainActivity : Activity() {
         FakeVpnService.stateListener = null
     }
 
-    override fun onPause() {
-        super.onPause()
-        installerSurfaced = true
-    }
-
     override fun onResume() {
         super.onResume()
         updateUi()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        runCatching { packageManager.packageInstaller.unregisterSessionCallback(sessionCallback) }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -248,7 +247,7 @@ class MainActivity : Activity() {
                 out.delete()
                 Repackager.build(this, File(applicationInfo.sourceDir), out, newName)
                 setRenameStatus(R.string.rename_installing)
-                mainHandler.post { installApk(out) }
+                installApk(out)
             } catch (e: Exception) {
                 Log.e(TAG, "repack flow failed", e)
                 setRenameFailed(getString(R.string.rename_failed_prefix) + (e.message ?: "error"))
@@ -257,33 +256,69 @@ class MainActivity : Activity() {
     }
 
     private fun installApk(file: File) {
-        try {
-            val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        if (!packageManager.canRequestPackageInstalls()) {
+            runOnUiThread {
+                renameStatus.text = getString(R.string.rename_need_source_permission)
+                renameButton.isEnabled = true
             }
-            installPending = true
-            installerSurfaced = false
-            installAttempts = 0
-            fireInstall(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "install intent failed", e)
-            setRenameFailed(getString(R.string.rename_failed_prefix) + "install")
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "open unknown app sources failed", e)
+            }
+            return
         }
-        renameButton.isEnabled = true
+        try {
+            val installer = packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            val sessionId = installer.createSession(params)
+            val session = installer.openSession(sessionId)
+            try {
+                file.inputStream().use { input ->
+                    val out = session.openWrite("repacked", 0, file.length())
+                    input.copyTo(out)
+                    session.fsync(out)
+                    out.close()
+                }
+                val sender = PendingIntent.getBroadcast(
+                    this,
+                    sessionId,
+                    Intent(this, MainActivity::class.java),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                ).intentSender
+                session.commit(sender)
+                Log.d(TAG, "package installer session $sessionId committed")
+            } finally {
+                runCatching { session.close() }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "package installer failed", e)
+            setRenameFailed(getString(R.string.rename_failed_prefix) + (e.message ?: "install"))
+        }
     }
 
-    private fun fireInstall(intent: Intent) {
-        installAttempts++
-        Log.i(TAG, "fire install attempt $installAttempts")
-        startActivity(intent)
-        mainHandler.postDelayed({
-            if (installPending && !installerSurfaced && installAttempts < 2) {
-                fireInstall(intent)
+    private val sessionCallback = object : PackageInstaller.SessionCallback() {
+        override fun onCreated(sessionId: Int) {}
+        override fun onBadgingChanged(sessionId: Int) {}
+        override fun onActiveChanged(sessionId: Int, active: Boolean) {}
+        override fun onProgressChanged(sessionId: Int, progress: Float) {}
+
+        override fun onFinished(sessionId: Int, success: Boolean) {
+            runOnUiThread {
+                if (success) {
+                    renameStatus.setText(R.string.rename_done)
+                } else {
+                    setRenameFailed(getString(R.string.rename_failed_prefix) + "install rejected by system")
+                }
+                setRenameIdle()
             }
-        }, 700L)
+        }
+    }
+
+    private fun setRenameIdle() {
+        runOnUiThread { renameButton.isEnabled = true }
     }
 
     private fun setRenameStatus(strId: Int) {
@@ -291,8 +326,6 @@ class MainActivity : Activity() {
     }
 
     private fun setRenameFailed(message: String) {
-        installPending = false
-        installerSurfaced = true
         runOnUiThread {
             renameStatus.text = message
             renameButton.isEnabled = true
