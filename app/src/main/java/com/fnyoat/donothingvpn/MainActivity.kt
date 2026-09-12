@@ -249,39 +249,18 @@ class MainActivity : Activity() {
 
     private fun installApk(file: File) {
         try {
-            if (!runSilentInstall(file)) {
-                val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                startActivity(intent)
+            val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
+            startActivity(intent)
         } catch (e: Exception) {
             Log.e(TAG, "install intent failed", e)
             setRenameFailed(getString(R.string.rename_failed_prefix) + "install")
         }
         renameButton.isEnabled = true
-    }
-
-    private fun runSilentInstall(file: File): Boolean {
-        val sh = "pm install -r -t ${file.absolutePath}"
-        for (su in arrayOf("su", "/system/bin/su", "/system/xbin/su", "/sbin/su", "/bin/su", "/su/bin/su")) {
-            try {
-                val p = ProcessBuilder(su, "-c", sh).redirectErrorStream(true).start()
-                val out = p.inputStream.readBytes().toString(Charsets.UTF_8)
-                p.waitFor()
-                if (out.contains("Success")) {
-                    Log.i(TAG, "silent install via $su ok")
-                    return true
-                }
-                Log.w(TAG, "su $su exit=${p.exitValue()} out=$out")
-            } catch (e: Exception) {
-                Log.w(TAG, "su $su unavailable", e)
-            }
-        }
-        return false
     }
 
     private fun setRenameStatus(strId: Int) {
