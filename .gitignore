@@ -2,7 +2,7 @@ build/
 .gradle/
 .idea/
 local.properties
-keystore/
-keystore-local.properties
+keystore/*
+!keystore/repack.p12
 *.iml
 .DS_Store
