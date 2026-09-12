@@ -27,6 +27,17 @@ jobs:
           cache-read-only: false
           cache-cleanup: never
 
+      - name: Resolve signing material from CI secrets
+        if: env.REPACK_KEYSTORE_BASE64 != ''
+        env:
+          KEYS_B64: ${{ secrets.REPACK_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.REPACK_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.REPACK_KEY_ALIAS }}
+        run: |
+          echo "$KEYS_B64" | base64 -d > keystore/repack.p12
+          printf 'repack.storePassword=%s\nrepack.keyAlias=%s\nrepack.keyPassword=%s\n' \
+            "$STORE_PASS" "$KEY_ALIAS" "$STORE_PASS" > keystore-local.properties
+
       - name: Build debug and release APK
         run: gradle assembleDebug assembleRelease --no-daemon
 
