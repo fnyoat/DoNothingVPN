@@ -15,10 +15,6 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light">
 
-        <meta-data
-            android:name="com.fnyoat.donothingvpn.default_session"
-            android:value="__SESSION_TEMPLATE__" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true">

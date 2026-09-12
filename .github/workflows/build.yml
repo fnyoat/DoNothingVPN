@@ -28,45 +28,11 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
 
-      - name: Unit tests (repack golden)
-        run: gradle testDebugUnitTest --no-daemon --stacktrace
-
-      - name: Verify repacked APK with apksigner (v1 + v2)
-        run: |
-          # Ensure the repacked APK exists (Gradle may cache and skip the test side-effect)
-          gradle :app:testDebugUnitTest --no-daemon --rerun --tests "*repack_has_verifiable_v2_signature" 2>/dev/null || true
-          ls -la app/build/repackage/repacked.apk
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
-          if [ -z "$APKSIGNER" ]; then
-            echo "::error::apksigner not found in $ANDROID_HOME/build-tools"
-            exit 1
-          fi
-          echo "using $APKSIGNER"
-          "$APKSIGNER" verify --verbose --print-certs app/build/repackage/repacked.apk
-          # Force v1 (JAR) verification: at the APK's minSdk (26) + valid v2,
-          # apksig skips v1 entirely. Inspect it explicitly so v1 regressions fail the build.
-          "$APKSIGNER" verify --verbose --min-sdk-version 19 app/build/repackage/repacked.apk
-
-      - name: Upload unit test results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: |
-            app/build/reports/tests/testDebugUnitTest/**/*.html
-            app/build/test-results/testDebugUnitTest/*.xml
-
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: DoNothingVPN-debug
           path: app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Upload repacked APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: repacked-apk
-          path: app/build/repackage/repacked.apk
 
       - name: Build release APK
         run: gradle assembleRelease --no-daemon

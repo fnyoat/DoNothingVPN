@@ -33,9 +33,11 @@ object Repackager {
     fun build(context: Context, sourceApk: File, output: File, newName: String) {
         val pk8 = context.assets.open("repack.pk8").use { it.readBytes() }
         val cer = context.assets.open("repack.cer").use { it.readBytes() }
-        val sessionTemplate = FakeVpnService.manifestMeta(context) ?: FakeVpnService.SESSION_TEMPLATE
+        val currentLabel = try {
+            context.packageManager.getApplicationLabel(context.applicationInfo).toString()
+        } catch (_: Exception) { TEMPLATE_LABEL }
+        buildWithKey(sourceApk, output, newName, currentLabel, pk8, cer)
         FakeVpnService.rememberSession(context, newName)
-        buildWithKey(sourceApk, output, newName, sessionTemplate, pk8, cer)
     }
 
     fun buildWithKey(sourceApk: File, output: File, newLabel: String, pk8: ByteArray, cer: ByteArray) {
